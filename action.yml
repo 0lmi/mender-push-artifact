@@ -5,21 +5,33 @@ inputs:
   mender_pat:
     description: 'personal access token for the hosted Mender backend account to be used'
     required: true
+  mender_artifact:
+    description: 'path of the artifact to be uploaded, relative to GITHUB_WORKSPACE'
+    required: true
   mender_uri:
     description: 'URI for the hosted Mender backend account to be used'
     required: false
     default: 'https://hosted.mender.io'
-  mender_artifact:
-    description: 'path of the artifact to be uploaded, relative to GITHUB_WORKSPACE'
-    required: true
 runs:
   using: "composite"
   steps:
     - id: upload_artifact
       run: |
-        curl -s -X POST ${{ inputs.mender_uri }}/api/management/v1/deployments/artifacts \
-        -H 'Content-Type: multipart/form-data' \
-        -H 'Accept: application/json' \
+        RESPONSE=$(curl -s -X POST ${{ inputs.mender_uri }}/api/management/v1/deployments/artifacts \
+        -H "Content-Type: multipart/form-data" \
+        -H "Accept: application/json" \
         -H "Authorization: Bearer ${{ inputs.mender_pat }}" \
-        -F artifact=@${GITHUB_WORKSPACE}/${{ inputs.mender_artifact }}
+        -F artifact=@${GITHUB_WORKSPACE}/${{ inputs.mender_artifact }})
+        if [[ ! -z "$RESPONSE" || "$RESPONSE" != "" ]]; then
+          if $(echo ${RESPONSE} | grep -q "An artifact with the same name has conflicting depends"); then
+            echo "WARN: artifact ${{ inputs.mender_artifact }} already exists on the server ${{ inputs.mender_uri }}, upload is skipped"
+            echo "Server's response: ${RESPONSE}"
+            exit 0
+          else
+            echo "ERROR: failed to upload artifact ${{ inputs.mender_artifact }} to ${{ inputs.mender_uri }}"
+            echo "Server's response: ${RESPONSE}"
+            exit 1
+          fi
+        fi
+        echo "INFO: artifact ${{ inputs.mender_artifact }} successfully uploaded to ${{ inputs.mender_uri }}"
       shell: bash
