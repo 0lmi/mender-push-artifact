@@ -15,7 +15,12 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - id: check_file
+      shell: bash
+      run: |
+        ls ${GITHUB_WORKSPACE}/${{ inputs.mender_artifact }} > /dev/null
     - id: upload_artifact
+      shell: bash
       run: |
         RESPONSE=$(curl -s -X POST ${{ inputs.mender_uri }}/api/management/v1/deployments/artifacts \
         -H "Content-Type: multipart/form-data" \
@@ -34,4 +39,3 @@ runs:
           fi
         fi
         echo "INFO: artifact ${{ inputs.mender_artifact }} successfully uploaded to ${{ inputs.mender_uri }}"
-      shell: bash
